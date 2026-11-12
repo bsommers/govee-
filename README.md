@@ -4,7 +4,7 @@ Design custom animations for Govee curtain lights. No runtime dependencies beyon
 
 ```
 uv sync                            # one-time setup
-uv run govee_fx                    # preview only -> http://localhost:8080
+uv run govee_fx                    # preview only -> http://localhost:8099
 uv run govee_fx --ip 192.168.1.50
 uv run pytest tests
 ```

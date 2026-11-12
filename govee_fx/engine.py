@@ -14,7 +14,7 @@ DEFAULT_CONFIG = {
     "device_mode": "razer",   # "razer" (per-pixel) or "color" (average colour)
     "serpentine": False,      # every other strip runs bottom->top
     "flip_x": False,
-    "port": 8080,
+    "port": 8099,
 }
 
 
