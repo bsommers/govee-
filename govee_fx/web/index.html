@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Govee FX</title>
+<style>
+:root{--bg:#0e0f13;--panel:#181a21;--line:#2a2d38;--fg:#e8e9ee;--dim:#8a8e9c;--accent:#ff7a1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;display:grid;gap:16px;padding:16px;max-width:900px;margin-inline:auto}
+h1{font-size:18px;margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+canvas{width:100%;display:block;background:#000;border-radius:8px}
+.row{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:12px;margin:12px 0}
+.row output{color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=text],button{background:#0e0f13;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--accent)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+small{color:var(--dim)}
+@media(max-width:560px){.row{grid-template-columns:1fr 52px}.row label{grid-column:1/-1}}
+</style></head><body>
+<h1>🔥 Govee FX</h1>
+<div class="card"><canvas id="cv"></canvas></div>
+<div class="card">
+  <div class="bar"><label>Animation</label><select id="effect"></select></div>
+  <div id="controls"></div>
+  <div class="row"><label>Brightness</label><input id="brightness" type="range" min="0" max="1" step="0.01"><output></output></div>
+</div>
+<div class="card">
+  <div class="bar">
+    <input id="ip" type="text" placeholder="Device IP (blank = preview only)" size="26">
+    <select id="mode"><option value="razer">Per-pixel (razer)</option><option value="color">Single colour</option></select>
+    <button id="connect">Connect</button><button id="scan">Scan</button>
+  </div>
+  <small id="devmsg"></small>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let state=null, grid={cols:20,rows:10};
+const post=(url,b)=>fetch(url,{method:'POST',body:JSON.stringify(b)}).then(r=>r.json());
+
+function build(s){
+  state=s; grid=s.grid;
+  const sel=$('effect'); sel.innerHTML=s.effects.map(e=>`<option value="${e.name}">${e.label}</option>`).join('');
+  sel.value=s.effect;
+  const eff=s.effects.find(e=>e.name===s.effect), box=$('controls'); box.innerHTML='';
+  for(const p of eff.params){
+    const v=s.params[p.key], row=document.createElement('div'); row.className='row';
+    if(p.type==='choice'){
+      row.innerHTML=`<label>${p.label}</label><select>${p.choices.map(c=>`<option ${c===v?'selected':''}>${c}</option>`).join('')}</select><span></span>`;
+      row.querySelector('select').onchange=e=>post('/api/params',{[p.key]:e.target.value});
+    }else{
+      row.innerHTML=`<label>${p.label}</label><input type=range min=${p.min} max=${p.max} step=${p.step} value=${v}><output>${(+v).toFixed(2)}</output>`;
+      const inp=row.querySelector('input'), out=row.querySelector('output');
+      inp.oninput=()=>{out.textContent=(+inp.value).toFixed(2);post('/api/params',{[p.key]:+inp.value});};
+    }
+    box.appendChild(row);
+  }
+  const b=$('brightness'), bo=b.nextElementSibling; b.value=s.brightness; bo.textContent=(+b.value).toFixed(2);
+  b.oninput=()=>{bo.textContent=(+b.value).toFixed(2);post('/api/params',{brightness:+b.value});};
+  $('ip').value=s.device.ip; $('mode').value=s.device.mode;
+}
+$('effect').onchange=e=>post('/api/effect',{name:e.target.value}).then(build);
+$('connect').onclick=()=>post('/api/device',{ip:$('ip').value,mode:$('mode').value}).then(s=>{build(s);$('devmsg').textContent=s.device.ip?'Streaming to '+s.device.ip:'Preview only'});
+$('scan').onclick=async()=>{
+  $('devmsg').textContent='Scanning…';
+  const r=await (await fetch('/api/discover')).json();
+  if(r.error||!r.length){$('devmsg').textContent=r.error||'No devices found. Is LAN Control enabled in the Govee Home app?';return;}
+  $('ip').value=r[0].ip; $('devmsg').textContent=r.map(d=>`${d.sku} @ ${d.ip}`).join(', ');
+};
+
+const cv=$('cv'), ctx=cv.getContext('2d');
+function draw(px){
+  const {cols,rows}=grid, cell=24, w=cols*cell, h=rows*cell;
+  if(cv.width!==w){cv.width=w;cv.height=h;}
+  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
+  ctx.globalCompositeOperation='lighter';
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    const i=(y*cols+x)*3, c=`rgb(${px[i]},${px[i+1]},${px[i+2]})`;
+    const g=ctx.createRadialGradient(x*cell+cell/2,y*cell+cell/2,1,x*cell+cell/2,y*cell+cell/2,cell*.9);
+    g.addColorStop(0,c);g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(x*cell-cell/2,y*cell-cell/2,cell*2,cell*2);
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+fetch('/api/state').then(r=>r.json()).then(s=>{build(s);new EventSource('/api/stream').onmessage=e=>draw(JSON.parse(e.data));});
+</script></body></html>
