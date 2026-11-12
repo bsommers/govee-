@@ -1,11 +1,18 @@
 # Govee FX
 
-Design custom animations for Govee curtain lights. No dependencies beyond Python 3.10+.
+Design custom animations for Govee curtain lights. No runtime dependencies beyond Python 3.10+.
 
 ```
-python -m govee_fx                 # preview only -> http://localhost:8080
-python -m govee_fx --ip 192.168.1.50
-python -m pytest tests
+uv sync                            # one-time setup
+uv run govee_fx                    # preview only -> http://localhost:8080
+uv run govee_fx --ip 192.168.1.50
+uv run pytest tests
+```
+
+To get a bare `govee_fx` command on your PATH: `uv tool install -e .` then
+
+```
+govee_fx --ip 192.168.1.50
 ```
 
 The browser UI shows a live preview and sliders for each animation's parameters.

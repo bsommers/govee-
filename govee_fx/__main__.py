@@ -19,4 +19,5 @@ def main():
     serve(Engine(cfg), cfg["port"])
 
 
-main()
+if __name__ == "__main__":
+    main()
