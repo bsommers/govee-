@@ -56,9 +56,16 @@ def razer_packet(command: int, payload: bytes) -> bytes:
     return body + bytes([_xor(body)])
 
 
-def razer_frame(pixels) -> bytes:
-    """pixels: flat list of (r,g,b) in device order."""
-    return razer_packet(0xB0, bytes([len(pixels)]) + b"".join(bytes(p) for p in pixels))
+def razer_frame(pixels, variant="gradient0") -> bytes:
+    """pixels: flat list of (r,g,b) in device order.
+
+    0xB0 LED data payload (per the OpenRGB Govee notes): [gradient flag, color
+    count, RGB...]. With gradient=0 and count == LED count each LED is set
+    individually. variant "legacy" is the old count-only payload (kept for probing).
+    """
+    rgb = b"".join(bytes(p) for p in pixels)
+    head = bytes([len(pixels)]) if variant == "legacy" else bytes([0, len(pixels)])
+    return razer_packet(0xB0, head + rgb)
 
 
 class LanDevice:

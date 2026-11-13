@@ -38,10 +38,30 @@ def test_intensity_controls_brightness():
 
 def test_razer_enable_matches_known_packet():
     assert razer_packet(0xB1, b"\x01").hex() == "bb0001b1010a"
-    assert razer_frame([(1, 2, 3)])[-1] == 0xBB ^ 0 ^ 4 ^ 0xB0 ^ 1 ^ 1 ^ 2 ^ 3
+    # payload = gradient(0), count(1), r, g, b  -> length 5
+    f = razer_frame([(1, 2, 3)])
+    assert f[:5].hex() == "bb0005b000"[:10]
+    assert f[-1] == 0xBB ^ 0 ^ 5 ^ 0xB0 ^ 0 ^ 1 ^ 1 ^ 2 ^ 3
+    assert razer_frame([(1, 2, 3)], "legacy")[2] == 4
 
 
 def test_device_order_serpentine():
     cfg = dict(cols=2, rows=2, serpentine=True, flip_x=False)
     frame = [[1, 2], [3, 4]]
     assert device_order(frame, cfg) == [1, 3, 4, 2]
+
+
+def test_nightsky_frame_shape_and_activity():
+    from govee_fx.effects import REGISTRY
+    cls = REGISTRY["nightsky"]
+    e = cls(10, 8)
+    p = cls.defaults()
+    p["frequency"] = 1.0
+    lit, shooters = 0, 0
+    for _ in range(600):
+        f = e.update(1 / 30, p)
+        assert len(f) == 8 and all(len(r) == 10 for r in f)
+        assert all(0 <= c <= 255 for r in f for px in r for c in px)
+        lit += sum(1 for r in f for px in r if max(px) > 40)
+        shooters = max(shooters, len(e.shooters))
+    assert lit > 0 and 1 <= shooters <= 3
